@@ -3,4 +3,3 @@ PyNaCl
 yt-dlp
 python-dotenv
 ffmpeg-python
-audioop-lts
