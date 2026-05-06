@@ -1,6 +1,6 @@
-discord.py
+discord.py[voice]
 PyNaCl
-yt-dlp
+yt-dlp>=2026.04.01
 python-dotenv
 ffmpeg-python
 davey
