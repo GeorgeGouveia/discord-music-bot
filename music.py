@@ -6,8 +6,11 @@ import asyncio
 
 YDL_OPTIONS = {
     "format": "bestaudio/best",
+    "noplaylist": True,
     "quiet": True,
-    "noplaylist": False
+    "default_search": "ytsearch",
+    "extract_flat": False,
+    "cookiefile": "cookies.txt",
 }
 
 FFMPEG_OPTIONS = {
@@ -33,22 +36,40 @@ class Music(commands.Cog):
             self.queue.append(self.current)
 
         if len(self.queue) == 0:
+            self.current = None
             return
 
         url = self.queue.pop(0)
         self.current = url
 
-        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-            info = ydl.extract_info(url, download=False)
-            stream_url = info["url"]
-            title = info["title"]
+        try:
+            with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                if "entries" in info:
+                    info = info["entries"][0]
+
+                stream_url = info["url"]
+                title = info["title"]
+
+        except Exception as e:
+            print(f"Erro yt-dlp: {e}")
+            await interaction.channel.send(
+                "❌ Não consegui carregar essa música. "
+                "YouTube pode ter bloqueado ou link inválido."
+            )
+
+            await self.play_next(interaction)
+            return
 
         source = await discord.FFmpegOpusAudio.from_probe(
             stream_url,
             **FFMPEG_OPTIONS
         )
 
-        interaction.guild.voice_client.play(
+        vc = interaction.guild.voice_client
+
+        vc.play(
             source,
             after=lambda e: asyncio.run_coroutine_threadsafe(
                 self.play_next(interaction),
@@ -63,7 +84,7 @@ class Music(commands.Cog):
         await interaction.response.defer()
 
         if not interaction.user.voice:
-            await interaction.followup.send("Entre em um canal de voz.")
+            await interaction.followup.send("❌ Entre em um canal de voz.")
             return
 
         if not interaction.guild.voice_client:
@@ -71,90 +92,99 @@ class Music(commands.Cog):
 
         self.queue.append(url)
 
-        await interaction.followup.send("Adicionado à fila.")
+        await interaction.followup.send(f"✅ Adicionado à fila: {url}")
 
         vc = interaction.guild.voice_client
         if not vc.is_playing():
             await self.play_next(interaction)
 
-    @app_commands.command(name="skip")
+    @app_commands.command(name="skip", description="Pular música")
     async def skip(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
+
         if vc and vc.is_playing():
             vc.stop()
-            await interaction.response.send_message("⏭️ Pulado")
+            await interaction.response.send_message("⏭️ Música pulada")
+        else:
+            await interaction.response.send_message("Nada tocando.")
 
-    @app_commands.command(name="pause")
+    @app_commands.command(name="pause", description="Pausar música")
     async def pause(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
-        if vc:
-            vc.pause()
-            await interaction.response.send_message("⏸️ Pausado")
 
-    @app_commands.command(name="resume")
+        if vc and vc.is_playing():
+            vc.pause()
+            await interaction.response.send_message("⏸️ Música pausada")
+        else:
+            await interaction.response.send_message("Nada tocando.")
+
+    @app_commands.command(name="resume", description="Continuar música")
     async def resume(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
-        if vc:
-            vc.resume()
-            await interaction.response.send_message("▶️ Continuado")
 
-    @app_commands.command(name="stop")
+        if vc and vc.is_paused():
+            vc.resume()
+            await interaction.response.send_message("▶️ Música retomada")
+        else:
+            await interaction.response.send_message("Nenhuma música pausada.")
+
+    @app_commands.command(name="stop", description="Parar música")
     async def stop(self, interaction: discord.Interaction):
         vc = interaction.guild.voice_client
         self.queue.clear()
+        self.current = None
 
         if vc:
             vc.stop()
             await vc.disconnect()
 
-        await interaction.response.send_message("⏹️ Parado")
+        await interaction.response.send_message("⏹️ Player parado e desconectado.")
 
-    @app_commands.command(name="queue")
+    @app_commands.command(name="queue", description="Mostrar fila")
     async def queue_cmd(self, interaction: discord.Interaction):
         if not self.queue:
-            await interaction.response.send_message("Fila vazia.")
+            await interaction.response.send_message("📭 Fila vazia.")
             return
 
         msg = "\n".join(
             [f"{i+1}. {song}" for i, song in enumerate(self.queue[:10])]
         )
 
-        await interaction.response.send_message(f"Fila:\n{msg}")
+        await interaction.response.send_message(f"📜 Fila:\n{msg}")
 
-    @app_commands.command(name="remove")
+    @app_commands.command(name="remove", description="Remover da fila")
     async def remove(self, interaction: discord.Interaction, position: int):
         if 0 < position <= len(self.queue):
             removed = self.queue.pop(position - 1)
             await interaction.response.send_message(
-                f"Removido: {removed}"
+                f"🗑️ Removido da fila: {removed}"
             )
+        else:
+            await interaction.response.send_message("Posição inválida.")
 
-    @app_commands.command(name="loop")
+    @app_commands.command(name="loop", description="Loop música atual")
     async def loop_song(self, interaction: discord.Interaction):
         self.loop = not self.loop
         await interaction.response.send_message(
-            f"Loop música: {self.loop}"
+            f"🔁 Loop música: {'ativado' if self.loop else 'desativado'}"
         )
 
-    @app_commands.command(name="loopqueue")
+    @app_commands.command(name="loopqueue", description="Loop fila")
     async def loop_queue_cmd(self, interaction: discord.Interaction):
         self.loop_queue = not self.loop_queue
         await interaction.response.send_message(
-            f"Loop fila: {self.loop_queue}"
+            f"🔂 Loop fila: {'ativado' if self.loop_queue else 'desativado'}"
         )
 
-    @app_commands.command(name="volume")
-    async def volume_cmd(self, interaction: discord.Interaction, volume: int):
-        self.volume = volume / 100
-        await interaction.response.send_message(
-            f"Volume ajustado: {volume}%"
-        )
-
-    @app_commands.command(name="nowplaying")
+    @app_commands.command(name="nowplaying", description="Música atual")
     async def nowplaying(self, interaction: discord.Interaction):
         if self.current:
             await interaction.response.send_message(
-                f"Tocando agora: {self.current}"
+                f"🎶 Tocando agora: {self.current}"
             )
         else:
             await interaction.response.send_message("Nada tocando.")
+
+
+async def setup(bot):
+    await bot.add_cog(Music(bot))
