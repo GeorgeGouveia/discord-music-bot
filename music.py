@@ -5,12 +5,17 @@ import yt_dlp
 import asyncio
 
 YDL_OPTIONS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio",
     "noplaylist": True,
     "quiet": True,
     "default_search": "ytsearch",
     "extract_flat": False,
     "cookiefile": "cookies.txt",
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "web"]
+        }
+    }
 }
 
 FFMPEG_OPTIONS = {
