@@ -5,16 +5,24 @@ import yt_dlp
 import asyncio
 
 YDL_OPTIONS = {
-    "format": "worst[ext=m4a]/worst",
+    "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
     "default_search": "ytsearch",
     "extract_flat": False,
+    "nocheckcertificate": True,
+    "ignoreerrors": False,
+    "geo_bypass": True,
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android", "web"]
+        }
+    }
 }
 
 FFMPEG_OPTIONS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-vn"
+    "options": "-vn -bufsize 64k"
 }
 
 
