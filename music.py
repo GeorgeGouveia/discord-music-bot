@@ -10,7 +10,6 @@ YDL_OPTIONS = {
     "quiet": True,
     "default_search": "ytsearch",
     "extract_flat": False,
-    "cookiefile": "cookies.txt",
 }
 
 FFMPEG_OPTIONS = {
